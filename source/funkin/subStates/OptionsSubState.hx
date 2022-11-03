@@ -37,10 +37,10 @@ class OptionsSubState extends MusicBeatSubstate
 	{
 		super.update(elapsed);
 
-		if (controls.UP_P)
+		if (Controls.getJustPressedAction("up"))
 			curSelected -= 1;
 
-		if (controls.DOWN_P)
+		if (Controls.getJustPressedAction("down"))
 			curSelected += 1;
 
 		if (curSelected < 0)
@@ -57,7 +57,7 @@ class OptionsSubState extends MusicBeatSubstate
 				txt.color = FlxColor.YELLOW;
 		});
 
-		if (controls.ACCEPT)
+		if (Controls.getJustPressedAction("accept"))
 		{
 			switch (textMenuItems[curSelected])
 			{

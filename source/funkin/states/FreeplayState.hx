@@ -198,9 +198,9 @@ class FreeplayState extends MusicBeatState
 
 		scoreText.text = "PERSONAL BEST:" + lerpScore;
 
-		var upP = controls.UP_P;
-		var downP = controls.DOWN_P;
-		var accepted = controls.ACCEPT;
+		var upP = Controls.getJustPressedAction("up");
+		var downP = Controls.getJustPressedAction("down");
+		var accepted = Controls.getJustPressedAction("accept");
 
 		if (upP)
 		{
@@ -211,12 +211,12 @@ class FreeplayState extends MusicBeatState
 			changeSelection(1);
 		}
 
-		if (controls.LEFT_P)
+		if (Controls.getJustPressedAction("left"))
 			changeDiff(-1);
-		if (controls.RIGHT_P)
+		if (Controls.getJustPressedAction("right"))
 			changeDiff(1);
 
-		if (controls.BACK)
+		if (Controls.getJustPressedAction("back"))
 		{
 			FlxG.switchState(new MainMenuState());
 		}

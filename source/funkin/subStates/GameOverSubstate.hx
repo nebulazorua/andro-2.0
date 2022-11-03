@@ -57,12 +57,12 @@ class GameOverSubstate extends MusicBeatSubstate
 	{
 		super.update(elapsed);
 
-		if (controls.ACCEPT)
+		if (Controls.getJustPressedAction("accept"))
 		{
 			endBullshit();
 		}
 
-		if (controls.BACK)
+		if (Controls.getJustPressedAction("back"))
 		{
 			FlxG.sound.music.stop();
 

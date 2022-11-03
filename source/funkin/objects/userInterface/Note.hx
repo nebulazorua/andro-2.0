@@ -8,8 +8,17 @@ import flixel.util.FlxColor;
 import polymod.format.ParseRules.TargetSignatureElement;
 #end
 import funkin.states.PlayState;
+import funkin.data.JudgeManager;
 
 using StringTools;
+
+@:enum abstract NoteType(String) from String to String // just to make it a bit easier when writing note type code
+{ 
+	var NONE = '';
+	var ALT_ANIM = 'alt animation';
+	var MINE = 'mine'; 
+	var FAKE = 'fake';
+}
 
 class Note extends FlxSprite
 {
@@ -21,17 +30,16 @@ class Note extends FlxSprite
 	public var tooLate:Bool = false;
 	public var wasGoodHit:Bool = false;
 	public var prevNote:Note;
+	public var judge:Judgement = UNJUDGED;
+
+	// TODO: sustainType, for roll or hold
+
+	public var noteType:String = NONE;
 
 	public var sustainLength:Float = 0;
 	public var isSustainNote:Bool = false;
 
-	public var noteScore:Float = 1;
-
 	public static var swagWidth:Float = 160 * 0.7;
-	public static var PURP_NOTE:Int = 0;
-	public static var GREEN_NOTE:Int = 2;
-	public static var BLUE_NOTE:Int = 1;
-	public static var RED_NOTE:Int = 3;
 
 	public function new(strumTime:Float, noteData:Int, ?prevNote:Note, ?sustainNote:Bool = false)
 	{
@@ -123,7 +131,6 @@ class Note extends FlxSprite
 
 		if (isSustainNote && prevNote != null)
 		{
-			noteScore * 0.2;
 			alpha = 0.6;
 
 			x += width / 2;
@@ -174,12 +181,11 @@ class Note extends FlxSprite
 
 		if (mustPress)
 		{
-			// The * 0.5 is so that it's easier to hit them too late, instead of too early
-			if (strumTime > Conductor.songPosition - Conductor.safeZoneOffset
-				&& strumTime < Conductor.songPosition + (Conductor.safeZoneOffset))
+			/*if (Math.abs(Conductor.songPosition - strumTime) <= PlayState.instance.judgeMan.hitWindow )
 				canBeHit = true;
 			else
-				canBeHit = false;
+				canBeHit = false;*/
+			canBeHit = PlayState.instance.judgeMan.judgeNote(this, Conductor.songPosition)!=UNJUDGED; // hopefully this isnt too terribly unoptimized or anything
 
 			if (strumTime < Conductor.songPosition - Conductor.safeZoneOffset && !wasGoodHit)
 				tooLate = true;

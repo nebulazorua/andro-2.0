@@ -1,6 +1,8 @@
 package funkin.states;
 
 
+import funkin.dependencies.input.Controls;
+import funkin.data.JudgeManager;
 import funkin.data.Section.SwagSection;
 import funkin.data.Song.SwagSong;
 import funkin.WiggleEffect.WiggleEffectType;
@@ -56,6 +58,12 @@ class PlayState extends MusicBeatState
 	public static var storyWeek:Int = 0;
 	public static var storyPlaylist:Array<String> = [];
 	public static var storyDifficulty:Int = 1;
+	public var hitNotes:Float = 0;
+	public var totalNotes:Float = 0;
+	public var accuracy:Float = 0;
+	public var comboBreaks:Int = 0;
+	public var judgeCounters:Map<Judgement,Int> = [];
+	
 
 	var halloweenLevel:Bool = false;
 
@@ -84,6 +92,7 @@ class PlayState extends MusicBeatState
 	private var gfSpeed:Int = 1;
 	private var health:Float = 1;
 	private var combo:Int = 0;
+	private var missCombo:Int = 0;
 
 	private var healthBarBG:FlxSprite;
 	private var healthBar:FlxBar;
@@ -119,6 +128,9 @@ class PlayState extends MusicBeatState
 	var talking:Bool = true;
 	var songScore:Int = 0;
 	var scoreTxt:FlxText;
+	
+	public var judgeMan:JudgeManager;
+	public static var instance:PlayState;
 
 	public static var campaignScore:Int = 0;
 
@@ -142,6 +154,9 @@ class PlayState extends MusicBeatState
 	{
 		if (FlxG.sound.music != null)
 			FlxG.sound.music.stop();
+		PlayState.instance = this;
+
+		judgeMan = new JudgeManager();
 
 		// var gameCam:FlxCamera = FlxG.camera;
 		camGame = new FlxCamera();
@@ -737,10 +752,11 @@ class PlayState extends MusicBeatState
 		// healthBar
 		add(healthBar);
 
-		scoreTxt = new FlxText(healthBarBG.x + healthBarBG.width - 190, healthBarBG.y + 30, 0, "", 20);
-		scoreTxt.setFormat(Paths.font("vcr.ttf"), 16, FlxColor.WHITE, RIGHT);
+		scoreTxt = new FlxText(0, healthBarBG.y + 36, FlxG.width, "", 20);
+		scoreTxt.setFormat(Paths.font("vcr.ttf"), 18, FlxColor.WHITE, CENTER, OUTLINE, FlxColor.BLACK);
 		scoreTxt.scrollFactor.set();
-		add(scoreTxt);
+		scoreTxt.borderSize = 1.1;
+		scoreTxt.screenCenter(X);
 
 		iconP1 = new HealthIcon(SONG.player1, true);
 		iconP1.y = healthBar.y - (iconP1.height / 2);
@@ -749,6 +765,12 @@ class PlayState extends MusicBeatState
 		iconP2 = new HealthIcon(SONG.player2, false);
 		iconP2.y = healthBar.y - (iconP2.height / 2);
 		add(iconP2);
+
+		add(scoreTxt);
+
+		for(judge in judgeMan.judgementMap.keys())
+			judgeCounters.set(judge, 0);
+		
 
 		strumLineNotes.cameras = [camHUD];
 		notes.cameras = [camHUD];
@@ -818,7 +840,26 @@ class PlayState extends MusicBeatState
 			}
 		}
 
+		Controls.onActionChanged.add(onActionChanged);
 		super.create();
+	}
+
+	function onActionChanged(action:String, keyCode:Int, state:ActionState) // called whenever the state of an action changes (gets pressed/released)
+	{
+		if (paused)
+			return;
+
+		switch (action)
+		{
+			case 'reset':
+				health = -1;
+			case 'up' | 'down' | 'left' | 'right':
+				var dirs = ["left", "down", "up", "right"];
+				var idx = dirs.indexOf(action);
+				trace(idx, state);
+				handleInput(idx, state);
+		}
+
 	}
 
 	function schoolIntro(?dialogueBox:DialogueBox):Void
@@ -1368,7 +1409,8 @@ class PlayState extends MusicBeatState
 
 		super.update(elapsed);
 
-		scoreTxt.text = "Score:" + songScore;
+		scoreTxt.text = 'Score: ${songScore} - Combo Breaks: ${comboBreaks} - Accuracy: ${accuracy}% ';
+		scoreTxt.screenCenter(X);
 
 		if (FlxG.keys.justPressed.ENTER && startedCountdown && canPause)
 		{
@@ -1565,18 +1607,11 @@ class PlayState extends MusicBeatState
 		// better streaming of shit
 
 		// RESET = Quick Game Over Screen
-		if (controls.RESET)
+		/*if (controls.RESET)
 		{
 			health = 0;
 			trace("RESET = True");
-		}
-
-		// CHEAT = brandon's a pussy
-		if (controls.CHEAT)
-		{
-			health += 1;
-			trace("User is cheating!");
-		}
+		}*/
 
 		if (health <= 0)
 		{
@@ -1682,7 +1717,9 @@ class PlayState extends MusicBeatState
 				{
 					if (daNote.tooLate || !daNote.wasGoodHit)
 					{
-						health -= 0.0475;
+						//health -= 0.0475;
+						//applyJudgement(MISS);
+						noteMiss(daNote.noteData);
 						vocals.volume = 0;
 					}
 
@@ -1943,70 +1980,70 @@ class PlayState extends MusicBeatState
 		curSection += 1;
 	}
 
+	function handleInput(data:Int, state:ActionState){
+		if (!boyfriend.stunned && generatedMusic && state==DOWN)
+		{
+			boyfriend.holdTimer = 0;
+			// collect all notes that can be hit at this point
+			var possibleNotes:Array<Note> = [];
+			notes.forEachAlive(function(daNote:Note)
+			{
+				if (daNote.canBeHit && daNote.noteData == data && daNote.mustPress && !daNote.tooLate && !daNote.wasGoodHit)
+					possibleNotes.push(daNote);
+			});
+
+			if (possibleNotes.length > 1)
+			{ // this is so if theres no notes to hit, its not wasting time
+				possibleNotes.sort((a, b) -> Std.int(a.strumTime - b.strumTime));
+				// grabbing stacked notes
+				var goobage:Array<Note> = [];
+				for (idx in 0...possibleNotes.length)
+				{
+					if (possibleNotes[idx - 1] != null && Math.abs(possibleNotes[idx - 1].strumTime - possibleNotes[idx].strumTime) <= 10)
+						goobage.push(possibleNotes[idx]);
+				}
+				// removing stacked notes
+				for (note in goobage)
+				{
+					note.kill();
+					notes.remove(note, true);
+					note.destroy();
+				}
+			}
+			// if there are any notes left, hit the most recent one
+			if (possibleNotes.length > 0)
+				goodNoteHit(possibleNotes[0]);			
+		}
+
+		playerStrums.forEach(function(spr:FlxSprite)
+		{
+			if (spr.ID == data)
+			{
+				if (state == DOWN && spr.animation.curAnim.name != 'confirm')
+					spr.animation.play('pressed', true);
+				if (state == UP)
+					spr.animation.play('static', true);
+			}
+
+			if (spr.animation.curAnim.name == 'confirm' && !curStage.startsWith('school'))
+			{
+				spr.centerOffsets();
+				spr.offset.x -= 13;
+				spr.offset.y -= 13;
+			}
+			else
+				spr.centerOffsets();
+		});
+	}
+
 	private function keyShit():Void
 	{
 		// HOLDING
-		var up = controls.UP;
-		var right = controls.RIGHT;
-		var down = controls.DOWN;
-		var left = controls.LEFT;
+		var up = Controls.getStateFromAction("up")==DOWN;
+		var right = Controls.getStateFromAction("right")==DOWN;
+		var down = Controls.getStateFromAction("down")==DOWN;
+		var left = Controls.getStateFromAction("left")==DOWN;
 
-		var upP = controls.UP_P;
-		var rightP = controls.RIGHT_P;
-		var downP = controls.DOWN_P;
-		var leftP = controls.LEFT_P;
-
-		var upR = controls.UP_R;
-		var rightR = controls.RIGHT_R;
-		var downR = controls.DOWN_R;
-		var leftR = controls.LEFT_R;
-
-		var controlArray:Array<Bool> = [leftP, downP, upP, rightP];
-
-		// FlxG.watch.addQuick('asdfa', upP);
-		// first thing im doing: REWRITING INPUT!
-		// ill move it to openfl later but for now i just want this done
-		// i will rewrite this again some other day but for now this will work
-		var pressedKeys:Array<Bool> = [leftP, downP, upP, rightP];
-		if (!boyfriend.stunned && generatedMusic)
-		{
-			if (pressedKeys.contains(true)){
-				boyfriend.holdTimer = 0;
-				
-				for(data in 0...pressedKeys.length){
-					if(!pressedKeys[data])continue;
-
-					// collect all notes that can be hit at this point
-					var possibleNotes:Array<Note> = [];
-					notes.forEachAlive(function(daNote:Note)
-					{
-						if (daNote.canBeHit && daNote.noteData==data && daNote.mustPress && !daNote.tooLate && !daNote.wasGoodHit)
-							possibleNotes.push(daNote);
-						
-					});
-
-					if(possibleNotes.length>1){ // this is so if theres no notes to hit, its not wasting time
-						possibleNotes.sort((a, b) -> Std.int(a.strumTime - b.strumTime));
-						// grabbing stacked notes
-						var goobage:Array<Note> = [];
-						for(idx in 0...possibleNotes.length){
-							if (possibleNotes[idx - 1] != null && Math.abs(possibleNotes[idx - 1].strumTime - possibleNotes[idx].strumTime) <= 10)
-								goobage.push(possibleNotes[idx]);
-						}
-						// removing stacked notes
-						for (note in goobage){
-							note.kill();
-							notes.remove(note, true);
-							note.destroy();
-						}
-					}
-					// if there are any notes left, hit the most recent one
-					if (possibleNotes.length > 0)
-						goodNoteHit(possibleNotes[0]);
-				}
-			}
-
-		}
 
 		if ((up || right || down || left) && !boyfriend.stunned && generatedMusic)
 		{
@@ -2042,7 +2079,7 @@ class PlayState extends MusicBeatState
 			}
 		}
 
-		playerStrums.forEach(function(spr:FlxSprite)
+		/*playerStrums.forEach(function(spr:FlxSprite)
 		{
 			switch (spr.ID)
 			{
@@ -2076,33 +2113,20 @@ class PlayState extends MusicBeatState
 			}
 			else
 				spr.centerOffsets();
-		});
+		});*/
 	}
 
 	function noteMiss(direction:Int = 1):Void
 	{
 		if (!boyfriend.stunned)
 		{
-			health -= 0.04;
 			if (combo > 5 && gf.animOffsets.exists('sad'))
-			{
 				gf.playAnim('sad');
-			}
-			combo = 0;
-
-			songScore -= 10;
+			
+			applyJudgement(MISS);
 
 			FlxG.sound.play(Paths.soundRandom('missnote', 1, 3), FlxG.random.float(0.1, 0.2));
-			// FlxG.sound.play(Paths.sound('missnote1'), 1, false);
-			// FlxG.log.add('played imss note');
 
-			boyfriend.stunned = true;
-
-			// get stunned for 5 seconds
-			new FlxTimer().start(5 / 60, function(tmr:FlxTimer)
-			{
-				boyfriend.stunned = false;
-			});
 
 			switch (direction)
 			{
@@ -2117,34 +2141,95 @@ class PlayState extends MusicBeatState
 			}
 		}
 	}
-
-	function badNoteCheck()
-	{
-		// just double pasting this shit cuz fuk u
-		// REDO THIS SYSTEM!
-		var upP = controls.UP_P;
-		var rightP = controls.RIGHT_P;
-		var downP = controls.DOWN_P;
-		var leftP = controls.LEFT_P;
-
-		if (leftP)
-			noteMiss(0);
-		if (downP)
-			noteMiss(1);
-		if (upP)
-			noteMiss(2);
-		if (rightP)
-			noteMiss(3);
+	
+	function showJudgement(name:String, diff:Float){
+		var sprite = judgeMan.getSprite(name);
+		sprite.screenCenter(XY);
+		sprite.cameras = [camHUD];
+		sprite.velocity.y = -FlxG.random.int(175, 200);
+		sprite.velocity.x = FlxG.random.int(-50, 50);
+		sprite.acceleration.y = FlxG.random.int(475, 650);
+		FlxTween.tween(sprite, {alpha: 0}, 0.2, {
+			ease: FlxEase.linear,
+			startDelay: Conductor.crochet / 1000,
+			onComplete: function(twn:FlxTween)
+			{
+				sprite.kill();
+			}
+		});
+		sprite.animation.play(diff < 0 ? "late" : "early");
+		add(sprite);
 	}
 
-	function noteCheck(keyP:Bool, note:Note):Void
-	{
-		if (keyP)
-			goodNoteHit(note);
-		else
+	function showCombo(shownCombo:Int = 0, brokeCombo:Bool=false){
+		var combos = Std.string(Math.abs(shownCombo)).split("");
+		if (combos.length < 3)
 		{
-			badNoteCheck();
+			for (i in combos.length...3)
+				combos.unshift("0");
 		}
+		if (shownCombo < 0){
+			combos.unshift("-");
+			brokeCombo=true;
+		}
+		var i:Int = 0;
+		for (num in combos)
+		{
+			var sprite = judgeMan.getNumber(num);
+			sprite.screenCenter(XY);
+			sprite.cameras = [camHUD];
+			sprite.x -= 150 - (50 * i);
+			sprite.y += 50;
+			sprite.velocity.y = -FlxG.random.int(100, 150);
+			sprite.velocity.x = FlxG.random.int(-25, 25);
+			sprite.acceleration.y = FlxG.random.int(250, 500);
+			FlxTween.tween(sprite, {alpha: 0}, 0.2, {
+				ease: FlxEase.linear,
+				startDelay: Conductor.crochet / 2000,
+				onComplete: function(twn:FlxTween)
+				{
+					sprite.kill();
+				}
+			});
+			if (brokeCombo)sprite.color = FlxColor.RED;
+
+			add(sprite);
+			i++;
+		}
+		
+	}
+
+	function judgeNote(note:Note){
+		var diff = note.strumTime - Conductor.songPosition;
+		var judgement = judgeMan.judgeNote(note, Conductor.songPosition);
+		applyJudgement(judgement, diff);
+		return judgement;
+	}
+
+	function applyJudgement(judge:Judgement, diff:Float = 0, show:Bool=true){
+		var judgementData = judgeMan.get(judge);
+		var brokeCombo = judgementData.accuracy<0;
+		if (brokeCombo){
+			combo = 0;
+			comboBreaks++;
+			missCombo--;
+		}else{
+			missCombo=0;
+			combo++;
+		}
+		
+		var shownCombo:Int = brokeCombo?missCombo:combo;
+		totalNotes++;
+		hitNotes += judgementData.accuracy / 100;
+		songScore += judgementData.score;
+		health += (judgementData.health / 100) * 2;
+		judgeCounters.set(judge, judgeCounters.get(judge)+1);
+
+		if (show){
+			showJudgement(judgementData.internalName, diff);
+			showCombo(shownCombo, brokeCombo);
+		}
+		accuracy = FlxMath.roundDecimal((hitNotes / totalNotes) * 100, 2);
 	}
 
 	function goodNoteHit(note:Note):Void
@@ -2152,15 +2237,10 @@ class PlayState extends MusicBeatState
 		if (!note.wasGoodHit)
 		{
 			if (!note.isSustainNote)
-			{
-				popUpScore(note.strumTime);
-				combo += 1;
-			}
+				judgeNote(note);
+			
 
-			if (note.noteData >= 0)
-				health += 0.023;
-			else
-				health += 0.004;
+			//health += 0.023;
 
 			switch (note.noteData)
 			{
@@ -2414,4 +2494,10 @@ class PlayState extends MusicBeatState
 	}
 
 	var curLight:Int = 0;
+
+	override function destroy()
+	{
+		Controls.onActionChanged.remove(onActionChanged);
+		return super.destroy();
+	}
 }

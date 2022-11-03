@@ -50,12 +50,14 @@ class GitarooPause extends MusicBeatState
 		super.create();
 	}
 
+
+
 	override function update(elapsed:Float)
 	{
-		if (controls.LEFT_P || controls.RIGHT_P)
+		if (Controls.getJustPressedAction("left") || Controls.getJustPressedAction("right"))
 			changeThing();
 
-		if (controls.ACCEPT)
+		if (Controls.getJustPressedAction("accept"))
 		{
 			if (replaySelect)
 			{
