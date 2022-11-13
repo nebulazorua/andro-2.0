@@ -84,7 +84,7 @@ class JudgeManager {
     public final hittableJudgements:Array<Judgement> = [TIER5, TIER4, TIER3, TIER2, TIER1]; // decides the hierarchy of judgements
     // make sure this is in order of highest window at the front, to lowest window at the back
 
-    public final judgementMap:Map<Judgement, Int> = [ // NONE isnt here because its a lack of judgement
+    public final judgementMap:Map<Judgement, Int> = [ // UNJUDGED isnt here because its a lack of judgement
         TIER5 => 0,
         TIER4 => 0,
         TIER3 => 1,
@@ -123,9 +123,9 @@ class JudgeManager {
 		var diff = Math.abs(note.strumTime - time);
         switch(note.noteType){
             case MINE:
-                // mine logic
+                // mine judge
             case FAKE:
-                return UNJUDGED; // fake notes dont ever get judged as they're fake
+                return UNJUDGED; // fake notes dont ever get judged, because they should never be hit
             default:
 				for (i in 0...hittableJudgements.length)
 				{

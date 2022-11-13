@@ -5,9 +5,10 @@ import flixel.FlxSprite;
 import flixel.animation.FlxBaseAnimation;
 import flixel.graphics.frames.FlxAtlasFrames;
 import funkin.states.PlayState;
+import funkin.data.scripts.HScript;
 
 using StringTools;
-
+//
 class Character extends FlxSprite
 {
 	public var animOffsets:Map<String, Array<Dynamic>>;
@@ -17,6 +18,8 @@ class Character extends FlxSprite
 	public var curCharacter:String = 'bf';
 
 	public var holdTimer:Float = 0;
+
+	public var hscript:HScript;
 
 	public function new(x:Float, y:Float, ?character:String = "bf", ?isPlayer:Bool = false)
 	{
@@ -28,6 +31,8 @@ class Character extends FlxSprite
 
 		var tex:FlxAtlasFrames;
 		antialiasing = true;
+
+		
 
 		switch (curCharacter)
 		{
@@ -564,47 +569,15 @@ class Character extends FlxSprite
 		{
 			switch (curCharacter)
 			{
-				case 'gf':
+				case 'gf' | 'gf-christmas' | 'gf-car' | 'gf-pixel':
 					if (!animation.curAnim.name.startsWith('hair'))
 					{
 						danced = !danced;
 
 						if (danced)
-							playAnim('danceRight');
+							playAnim('danceRight', true);
 						else
-							playAnim('danceLeft');
-					}
-
-				case 'gf-christmas':
-					if (!animation.curAnim.name.startsWith('hair'))
-					{
-						danced = !danced;
-
-						if (danced)
-							playAnim('danceRight');
-						else
-							playAnim('danceLeft');
-					}
-
-				case 'gf-car':
-					if (!animation.curAnim.name.startsWith('hair'))
-					{
-						danced = !danced;
-
-						if (danced)
-							playAnim('danceRight');
-						else
-							playAnim('danceLeft');
-					}
-				case 'gf-pixel':
-					if (!animation.curAnim.name.startsWith('hair'))
-					{
-						danced = !danced;
-
-						if (danced)
-							playAnim('danceRight');
-						else
-							playAnim('danceLeft');
+							playAnim('danceLeft', true);
 					}
 
 				case 'spooky':

@@ -34,7 +34,13 @@ class Conductor
 
 	public static function mapBPMChanges(song:SwagSong)
 	{
-		bpmChangeMap = [];
+		bpmChangeMap = [
+			{
+				stepTime: 0,
+				songTime: 0,
+				bpm: song.bpm
+			}
+		];
 
 		var curBPM:Int = song.bpm;
 		var totalSteps:Int = 0;
@@ -57,6 +63,24 @@ class Conductor
 			totalPos += ((60 / curBPM) * 1000 / 4) * deltaSteps;
 		}
 		trace("new BPM map BUDDY " + bpmChangeMap);
+	}
+
+	public static function secsFromStep(step:Int){
+		var index:Int = 0;
+
+		for (i in 0...Conductor.bpmChangeMap.length)
+		{
+			if (step >= Conductor.bpmChangeMap[i].stepTime)
+				index = i;
+		}
+
+		if (index > 0){
+			var lStep = Conductor.bpmChangeMap[index - 1].stepTime;
+			var cStep = step - lStep;
+			return (lStep * (((60 / bpm) * 1000)) / 4) + cStep * stepCrochet;
+		}else
+			return step * stepCrochet;
+		
 	}
 
 	public static function changeBPM(newBpm:Int)

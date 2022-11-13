@@ -52,6 +52,8 @@ import funkin.subStates.*;
 using StringTools;
 class PlayState extends MusicBeatState
 {
+	public var hscriptGlobals:Map<String, Dynamic> = [];
+
 	public static var curStage:String = '';
 	public static var SONG:SwagSong;
 	public static var isStoryMode:Bool = false;
@@ -63,6 +65,7 @@ class PlayState extends MusicBeatState
 	public var accuracy:Float = 0;
 	public var comboBreaks:Int = 0;
 	public var judgeCounters:Map<Judgement,Int> = [];
+	public var judgeTexts:Map<Judgement,String> = [];
 	
 
 	var halloweenLevel:Bool = false;
@@ -856,7 +859,6 @@ class PlayState extends MusicBeatState
 			case 'up' | 'down' | 'left' | 'right':
 				var dirs = ["left", "down", "up", "right"];
 				var idx = dirs.indexOf(action);
-				trace(idx, state);
 				handleInput(idx, state);
 		}
 
@@ -1688,6 +1690,7 @@ class PlayState extends MusicBeatState
 							altAnim = '-alt';
 					}
 
+					/*
 					switch (Math.abs(daNote.noteData))
 					{
 						case 0:
@@ -1698,7 +1701,8 @@ class PlayState extends MusicBeatState
 							dad.playAnim('singUP' + altAnim, true);
 						case 3:
 							dad.playAnim('singRIGHT' + altAnim, true);
-					}
+					}*/
+					charPlayDirectional(dad, daNote.noteData, altAnim);
 
 					dad.holdTimer = 0;
 
@@ -1719,7 +1723,7 @@ class PlayState extends MusicBeatState
 					{
 						//health -= 0.0475;
 						//applyJudgement(MISS);
-						noteMiss(daNote.noteData);
+						noteMiss(daNote);
 						vocals.volume = 0;
 					}
 
@@ -1811,7 +1815,7 @@ class PlayState extends MusicBeatState
 				PlayState.SONG = Song.loadFromJson(PlayState.storyPlaylist[0].toLowerCase() + difficulty, PlayState.storyPlaylist[0]);
 				FlxG.sound.music.stop();
 
-				LoadingState.loadAndSwitchState(new PlayState());
+				FlxG.switchState(new PlayState());
 			}
 		}
 		else
@@ -2045,6 +2049,7 @@ class PlayState extends MusicBeatState
 		var left = Controls.getStateFromAction("left")==DOWN;
 
 
+		// TODO: rewrite this
 		if ((up || right || down || left) && !boyfriend.stunned && generatedMusic)
 		{
 			notes.forEachAlive(function(daNote:Note)
@@ -2116,7 +2121,7 @@ class PlayState extends MusicBeatState
 		});*/
 	}
 
-	function noteMiss(direction:Int = 1):Void
+	function noteMiss(note:Note):Void
 	{
 		if (!boyfriend.stunned)
 		{
@@ -2127,21 +2132,28 @@ class PlayState extends MusicBeatState
 
 			FlxG.sound.play(Paths.soundRandom('missnote', 1, 3), FlxG.random.float(0.1, 0.2));
 
-
-			switch (direction)
-			{
-				case 0:
-					boyfriend.playAnim('singLEFTmiss', true);
-				case 1:
-					boyfriend.playAnim('singDOWNmiss', true);
-				case 2:
-					boyfriend.playAnim('singUPmiss', true);
-				case 3:
-					boyfriend.playAnim('singRIGHTmiss', true);
-			}
+			charPlayDirectional(boyfriend, note.noteData, 'miss');
 		}
 	}
 	
+	var singAnims:Array<String> = [
+		"LEFT",
+		"DOWN",
+		"UP",
+		"RIGHT"
+	];
+
+	inline function charPlayDirectional(char:Character, data:Int, suffix:String="", prefix="sing"){
+		var dir = singAnims[data];
+
+		var play:String = '${prefix}${dir}${suffix}';
+		if (char.animation.getByName(play) == null)play = '${prefix}${dir}';
+
+		char.playAnim(play, true);
+		char.holdTimer = 0;
+	}
+	
+
 	function showJudgement(name:String, diff:Float){
 		var sprite = judgeMan.getSprite(name);
 		sprite.screenCenter(XY);
@@ -2202,11 +2214,18 @@ class PlayState extends MusicBeatState
 	function judgeNote(note:Note){
 		var diff = note.strumTime - Conductor.songPosition;
 		var judgement = judgeMan.judgeNote(note, Conductor.songPosition);
-		applyJudgement(judgement, diff);
+		if(judgement!=UNJUDGED){
+			applyJudgement(judgement, diff);
+			note.hitResult.judgement = judgement;
+			note.hitResult.difference = diff;
+		}
+		
 		return judgement;
 	}
 
 	function applyJudgement(judge:Judgement, diff:Float = 0, show:Bool=true){
+		if(judge==UNJUDGED)return;
+
 		var judgementData = judgeMan.get(judge);
 		var brokeCombo = judgementData.accuracy<0;
 		if (brokeCombo){
@@ -2238,11 +2257,10 @@ class PlayState extends MusicBeatState
 		{
 			if (!note.isSustainNote)
 				judgeNote(note);
-			
+			else
+				health += 0.023;
 
-			//health += 0.023;
-
-			switch (note.noteData)
+			/*switch (note.noteData)
 			{
 				case 0:
 					boyfriend.playAnim('singLEFT', true);
@@ -2252,7 +2270,8 @@ class PlayState extends MusicBeatState
 					boyfriend.playAnim('singUP', true);
 				case 3:
 					boyfriend.playAnim('singRIGHT', true);
-			}
+			}*/
+			charPlayDirectional(boyfriend, note.noteData);
 
 			playerStrums.forEach(function(spr:FlxSprite)
 			{
