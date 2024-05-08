@@ -18,7 +18,7 @@ typedef HitResult = {
 	var difference:Float;
 }
 
-@:enum abstract NoteType(String) from String to String // just to make it a bit easier when writing note type code
+enum abstract NoteType(String) from String to String // just to make it a bit easier when writing note type code
 { 
 	var NONE = '';
 	var ALT_ANIM = 'alt animation';
@@ -297,7 +297,9 @@ class Note extends FlxSprite // maybe like ScriptableSprite idfk man
 			// prob gonna end up removing this all entirely, and having the canBeHit n shit be handled in PlayState
 			// TODO: replace with like.. isHittable(judgeNote())	
 
-			if(!tooLate && !wasGoodHit)
+            
+            // remove this once i rewrite holds
+			if(!tooLate && !wasGoodHit && isSustainNote)
 				canBeHit = PlayState.instance.judgeMan.judgeNote(this, Conductor.songPosition)!=UNJUDGED; // hopefully this isnt too terribly unoptimized or anything
 
 			if (strumTime < Conductor.songPosition - Conductor.safeZoneOffset && !wasGoodHit)
@@ -305,8 +307,6 @@ class Note extends FlxSprite // maybe like ScriptableSprite idfk man
 		}
 		else
 		{
-			canBeHit = false;
-
 			if (strumTime <= Conductor.songPosition)
 				wasGoodHit = true;
 		}

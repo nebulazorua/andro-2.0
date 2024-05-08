@@ -1987,12 +1987,15 @@ class PlayState extends MusicBeatState
 	function handleInput(data:Int, state:ActionState){
 		if (!boyfriend.stunned && generatedMusic && state==DOWN)
 		{
+            // TODO: i can rewrite this again lol
+            // I should rewrite this again
+            
 			boyfriend.holdTimer = 0;
 			// collect all notes that can be hit at this point
 			var possibleNotes:Array<Note> = [];
 			notes.forEachAlive(function(daNote:Note)
 			{
-				if (daNote.canBeHit && daNote.noteData == data && daNote.mustPress && !daNote.tooLate && !daNote.wasGoodHit)
+				if (daNote.mustPress && judgeMan.judgeNote(daNote, Conductor.songPosition) != UNJUDGED && daNote.noteData == data && !daNote.tooLate && !daNote.wasGoodHit)
 					possibleNotes.push(daNote);
 			});
 
